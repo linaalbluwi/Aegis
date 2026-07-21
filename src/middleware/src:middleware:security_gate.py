@@ -6,6 +6,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from src.detectors.sqli import detect_sqli
 from src.detectors.xss import detect_xss
+from src.detectors.command_injection import detect_command_injection
 from src.detectors.data_leak import detect_pii, detect_sensitive_keywords
 
 
@@ -27,17 +28,20 @@ class SecurityGate(BaseHTTPMiddleware):
         for key, value in request.query_params.items():
             findings.extend(detect_sqli(value))
             findings.extend(detect_xss(value))
+            findings.extend(detect_command_injection(value))
 
         # Check headers
         for key, value in request.headers.items():
             findings.extend(detect_sqli(value))
             findings.extend(detect_xss(value))
+            findings.extend(detect_command_injection(value))
 
         # Check body
         if body:
             body_text = body.decode("utf-8", errors="ignore")
             findings.extend(detect_sqli(body_text))
             findings.extend(detect_xss(body_text))
+            findings.extend(detect_command_injection(body_text))
 
         # If attacks found in request, block it
         if findings:
