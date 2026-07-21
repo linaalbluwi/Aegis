@@ -8,7 +8,7 @@ from src.detectors.sqli import detect_sqli
 from src.detectors.xss import detect_xss
 from src.detectors.command_injection import detect_command_injection
 from src.detectors.data_leak import detect_pii, detect_sensitive_keywords
-
+from src.detectors.path_traversal import detect_path_traversal
 
 class SecurityGate(BaseHTTPMiddleware):
     """
@@ -28,20 +28,26 @@ class SecurityGate(BaseHTTPMiddleware):
         for key, value in request.query_params.items():
             findings.extend(detect_sqli(value))
             findings.extend(detect_xss(value))
-            findings.extend(detect_command_injection(value))
+            findings.extend(detect_command_injection(value)) 
+            findings.extend(detect_path_traversal(value))
+            findings.extend(detect_path_traversal(body_text))
 
         # Check headers
         for key, value in request.headers.items():
             findings.extend(detect_sqli(value))
             findings.extend(detect_xss(value))
-            findings.extend(detect_command_injection(value))
+            findings.extend(detect_command_injection(value)) 
+            findings.extend(detect_path_traversal(value))
+            findings.extend(detect_path_traversal(body_text))
 
         # Check body
         if body:
             body_text = body.decode("utf-8", errors="ignore")
             findings.extend(detect_sqli(body_text))
             findings.extend(detect_xss(body_text))
-            findings.extend(detect_command_injection(body_text))
+            findings.extend(detect_command_injection(body_text)) 
+            findings.extend(detect_path_traversal(value))
+            findings.extend(detect_path_traversal(body_text))
 
         # If attacks found in request, block it
         if findings:
