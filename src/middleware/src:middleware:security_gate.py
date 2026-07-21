@@ -9,6 +9,8 @@ from src.detectors.xss import detect_xss
 from src.detectors.command_injection import detect_command_injection
 from src.detectors.data_leak import detect_pii, detect_sensitive_keywords
 from src.detectors.path_traversal import detect_path_traversal
+from src.middleware.rate_limiter import rate_limit
+
 
 class SecurityGate(BaseHTTPMiddleware):
     """
@@ -17,8 +19,13 @@ class SecurityGate(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):
-        findings = []
+    
+        # --- RATE LIMIT CHECK ---
+    rate_limit_response = rate_limit(request)
+    if rate_limit_response:
+        return rate_limit_response
 
+    findings = []
         # --- INBOUND: Inspect the request ---
         body = b""
         if request.method in ("POST", "PUT", "PATCH"):

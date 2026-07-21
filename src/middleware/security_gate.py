@@ -5,7 +5,11 @@ import json
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from src.detectors.sqli import detect_sqli
+from src.detectors.xss import detect_xss
+from src.detectors.command_injection import detect_command_injection
+from src.detectors.path_traversal import detect_path_traversal
 from src.detectors.data_leak import detect_pii, detect_sensitive_keywords
+from src.middleware.rate_limiter import rate_limit
 
 
 class SecurityGate(BaseHTTPMiddleware):
@@ -15,6 +19,11 @@ class SecurityGate(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):
+        # --- RATE LIMIT CHECK ---
+        rate_limit_response = rate_limit(request)
+        if rate_limit_response:
+            return rate_limit_response
+
         findings = []
 
         # --- INBOUND: Inspect the request ---
@@ -25,15 +34,26 @@ class SecurityGate(BaseHTTPMiddleware):
         # Check query parameters
         for key, value in request.query_params.items():
             findings.extend(detect_sqli(value))
+            findings.extend(detect_xss(value))
+            findings.extend(detect_command_injection(value))
+            findings.extend(detect_path_traversal(value))
 
-        # Check headers
+        # Check headers (only user-controlled ones)
+        suspicious_headers = ["user-agent", "referer", "x-forwarded-for", "cookie"]
         for key, value in request.headers.items():
-            findings.extend(detect_sqli(value))
+            if key.lower() in suspicious_headers:
+                findings.extend(detect_sqli(value))
+                findings.extend(detect_xss(value))
+                findings.extend(detect_command_injection(value))
+                findings.extend(detect_path_traversal(value))
 
         # Check body
         if body:
             body_text = body.decode("utf-8", errors="ignore")
             findings.extend(detect_sqli(body_text))
+            findings.extend(detect_xss(body_text))
+            findings.extend(detect_command_injection(body_text))
+            findings.extend(detect_path_traversal(body_text))
 
         # If attacks found in request, block it
         if findings:
@@ -67,7 +87,6 @@ class SecurityGate(BaseHTTPMiddleware):
             print(f"[!] DATA LEAK DETECTED in response:")
             for f in leak_findings:
                 print(f"    - {f}")
-            # In production, you might alert or redact instead of blocking the response
 
         # Return the original response
         return Response(
