@@ -2,8 +2,8 @@
 Sensitive data leakage detection.
 """
 import re
+from aegis.utils.safe_regex import safe_search
 
-# Patterns for common PII and sensitive data
 PII_PATTERNS = {
     "CREDIT_CARD": r"\b(?:\d[ -]*?){13,16}\b",
     "SSN": r"\b\d{3}-\d{2}-\d{4}\b",
@@ -13,7 +13,6 @@ PII_PATTERNS = {
     "JWT_TOKEN": r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+",
 }
 
-# Sensitive keywords in responses that shouldn't leak
 SENSITIVE_KEYWORDS = [
     "password", "secret", "private_key", "connection_string",
     "admin", "root", "internal_ip", "backup",
@@ -21,22 +20,20 @@ SENSITIVE_KEYWORDS = [
 
 
 def detect_pii(text: str) -> list[dict]:
-    """Detect PII patterns in text."""
     findings = []
     for pii_type, pattern in PII_PATTERNS.items():
-        matches = re.finditer(pattern, text)
+        matches = safe_search(pattern, text)
         for match in matches:
             findings.append({
                 "type": "PII_EXPOSURE",
                 "pii_type": pii_type,
-                "match": match.group()[:20] + "...",  # Truncate for safe logging
+                "match": match.group()[:20] + "...",
                 "position": match.start(),
             })
     return findings
 
 
 def detect_sensitive_keywords(text: str) -> list[dict]:
-    """Detect sensitive keywords that shouldn't be exposed."""
     findings = []
     for keyword in SENSITIVE_KEYWORDS:
         if keyword.lower() in text.lower():

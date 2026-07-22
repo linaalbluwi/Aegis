@@ -2,6 +2,7 @@
 SQL Injection detection patterns.
 """
 import re
+from aegis.utils.safe_regex import safe_search
 
 SQLI_PATTERNS = [
     r"(?i)(\bUNION\s+SELECT\b)",
@@ -25,7 +26,7 @@ SQLI_PATTERNS = [
 def detect_sqli(payload: str) -> list[dict]:
     findings = []
     for pattern in SQLI_PATTERNS:
-        matches = re.finditer(pattern, payload)
+        matches = safe_search(pattern, payload)
         for match in matches:
             findings.append({
                 "type": "SQL_INJECTION",

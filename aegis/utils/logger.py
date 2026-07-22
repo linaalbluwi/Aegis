@@ -1,20 +1,36 @@
 """
-Structured security event logger.
-Logs all security events to a JSON file with timestamps and metadata.
+Structured security event logger with rotation.
 """
 import json
 import os
+import glob
 from datetime import datetime, timezone
+from aegis import config
 
 
-LOG_DIR = "logs"
-LOG_FILE = os.path.join(LOG_DIR, "security_events.json")
+LOG_FILE = os.path.join(config.LOG_DIR, "security_events.json")
 
 
 def _ensure_log_dir():
-    """Create the logs directory if it doesn't exist."""
-    if not os.path.exists(LOG_DIR):
-        os.makedirs(LOG_DIR)
+    if not os.path.exists(config.LOG_DIR):
+        os.makedirs(config.LOG_DIR)
+
+
+def _rotate_if_needed():
+    """Rotate log file if it exceeds max size."""
+    if not os.path.exists(LOG_FILE):
+        return
+
+    size = os.path.getsize(LOG_FILE)
+    if size > config.LOG_ROTATION_SIZE:
+        # Remove oldest backup
+        backups = sorted(glob.glob(f"{LOG_FILE}.*"))
+        if len(backups) >= config.LOG_BACKUP_COUNT:
+            os.remove(backups[0])
+
+        # Rotate current file
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        os.rename(LOG_FILE, f"{LOG_FILE}.{timestamp}")
 
 
 def log_event(
@@ -25,10 +41,8 @@ def log_event(
     request_path: str = "",
     request_method: str = "",
 ):
-    """
-    Log a security event to the JSON log file.
-    """
     _ensure_log_dir()
+    _rotate_if_needed()
 
     event = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -45,7 +59,6 @@ def log_event(
 
 
 def get_severity(event_type: str) -> str:
-    """Map event type to severity level."""
     severity_map = {
         "SQL_INJECTION": "CRITICAL",
         "COMMAND_INJECTION": "CRITICAL",

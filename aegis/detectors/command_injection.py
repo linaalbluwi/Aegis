@@ -2,6 +2,7 @@
 Command injection detection patterns.
 """
 import re
+from aegis.utils.safe_regex import safe_search
 
 CMD_INJECTION_PATTERNS = [
     r"\|\s*\w+",
@@ -32,7 +33,7 @@ CMD_INJECTION_PATTERNS = [
 def detect_command_injection(payload: str) -> list[dict]:
     findings = []
     for pattern in CMD_INJECTION_PATTERNS:
-        matches = re.finditer(pattern, payload)
+        matches = safe_search(pattern, payload)
         for match in matches:
             findings.append({
                 "type": "COMMAND_INJECTION",
