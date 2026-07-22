@@ -1,0 +1,2 @@
+[console_scripts]
+api-security = api_security_agent.cli:main

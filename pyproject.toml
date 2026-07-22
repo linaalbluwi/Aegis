@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "api-security-agent"
+version = "0.1.0"
+description = "Protect your API from SQL injection, XSS, command injection, path traversal, and data leaks"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "linaalbluwi", email = "linaalbluwi3@gmail.com"}
+]
+keywords = ["security", "api", "middleware", "fastapi", "xss", "sql-injection", "waf"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Security",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Framework :: FastAPI",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "pyyaml>=6.0",
+    "python-multipart>=0.0.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "httpx>=0.24.0",
+]
+
+[project.scripts]
+api-security = "api_security_agent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["api_security_agent*"]

@@ -1,0 +1,28 @@
+Metadata-Version: 2.4
+Name: api-security-agent
+Version: 0.1.0
+Summary: Protect your API from SQL injection, XSS, command injection, path traversal, and data leaks
+Author-email: linaalbluwi <linaalbluwi3@gmail.com>
+License: MIT
+Keywords: security,api,middleware,fastapi,xss,sql-injection,waf
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Security
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Operating System :: OS Independent
+Classifier: Framework :: FastAPI
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.100.0
+Requires-Dist: uvicorn>=0.23.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: python-multipart>=0.0.6
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: httpx>=0.24.0; extra == "dev"
