@@ -1,5 +1,5 @@
 Metadata-Version: 2.4
-Name: aegis
+Name: aegis-api-shield
 Version: 0.1.0
 Summary: Protect your API from SQL injection, XSS, command injection, path traversal, and data leaks
 Author-email: linaalbluwi <linaalbluwi3@gmail.com>
@@ -26,3 +26,35 @@ Requires-Dist: python-multipart>=0.0.6
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0; extra == "dev"
 Requires-Dist: httpx>=0.24.0; extra == "dev"
+
+# Aegis
+
+Drop-in security middleware for FastAPI that protects against OWASP Top 10 API attacks.
+
+## Quick Start
+
+pip install aegis
+
+from aegis import SecurityGate
+app.add_middleware(SecurityGate)
+
+## What It Detects
+
+- SQL Injection
+- XSS
+- Command Injection
+- Path Traversal
+- JWT Attacks
+- Data Leaks
+
+## Docker
+
+docker run -p 8443:8443 linaalbluwi/aegis
+
+## Tests
+
+python -m pytest tests/ -v
+
+## License
+
+MIT

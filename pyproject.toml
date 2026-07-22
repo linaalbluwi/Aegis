@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aegis"
+name = "aegis-api-shield"
 version = "0.1.0"
 description = "Protect your API from SQL injection, XSS, command injection, path traversal, and data leaks"
 readme = "README.md"
