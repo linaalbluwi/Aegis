@@ -11,6 +11,7 @@ from aegis.detectors.path_traversal import detect_path_traversal
 from aegis.detectors.data_leak import detect_pii, detect_sensitive_keywords
 from aegis.detectors.jwt_inspector import extract_jwt, inspect_jwt
 from aegis.middleware.rate_limiter import rate_limit
+from aegis.middleware.input_validation import validate_request
 from aegis.utils.logger import log_event, get_severity
 
 
@@ -34,6 +35,15 @@ class SecurityGate(BaseHTTPMiddleware):
             )
             return rate_limit_response
 
+        # --- INPUT VALIDATION ---
+        body = b""
+        if request.method in ("POST", "PUT", "PATCH"):
+            body = await request.body()
+
+        validation_response = validate_request(request, body)
+        if validation_response:
+            return validation_response
+
         findings = []
 
         # --- JWT INSPECTION ---
@@ -54,26 +64,27 @@ class SecurityGate(BaseHTTPMiddleware):
                     )
 
         # --- INBOUND: Inspect the request ---
-        body = b""
-        if request.method in ("POST", "PUT", "PATCH"):
-            body = await request.body()
-
+        # Check query parameters (truncated for safety)
         for key, value in request.query_params.items():
-            findings.extend(detect_sqli(value))
-            findings.extend(detect_xss(value))
-            findings.extend(detect_command_injection(value))
-            findings.extend(detect_path_traversal(value))
+            safe_value = value[:2000]  # Truncate to prevent resource exhaustion
+            findings.extend(detect_sqli(safe_value))
+            findings.extend(detect_xss(safe_value))
+            findings.extend(detect_command_injection(safe_value))
+            findings.extend(detect_path_traversal(safe_value))
 
+        # Check headers (only user-controlled ones, truncated)
         suspicious_headers = ["user-agent", "referer", "x-forwarded-for", "cookie"]
         for key, value in request.headers.items():
             if key.lower() in suspicious_headers:
-                findings.extend(detect_sqli(value))
-                findings.extend(detect_xss(value))
-                findings.extend(detect_command_injection(value))
-                findings.extend(detect_path_traversal(value))
+                safe_value = value[:1000]
+                findings.extend(detect_sqli(safe_value))
+                findings.extend(detect_xss(safe_value))
+                findings.extend(detect_command_injection(safe_value))
+                findings.extend(detect_path_traversal(safe_value))
 
+        # Check body (truncated)
         if body:
-            body_text = body.decode("utf-8", errors="ignore")
+            body_text = body.decode("utf-8", errors="ignore")[:10_000]
             findings.extend(detect_sqli(body_text))
             findings.extend(detect_xss(body_text))
             findings.extend(detect_command_injection(body_text))
@@ -83,16 +94,15 @@ class SecurityGate(BaseHTTPMiddleware):
             print(f"[!] BLOCKED - {len(findings)} threat(s) detected:")
             for f in findings:
                 print(f"    - {f}")
-                if f.get("type", "").startswith("JWT"):
-                    continue  # Already logged above
-                log_event(
-                    event_type=f["type"],
-                    severity=get_severity(f["type"]),
-                    client_ip=client_ip,
-                    details=f,
-                    request_path=request_path,
-                    request_method=request_method,
-                )
+                if not f.get("type", "").startswith("JWT"):
+                    log_event(
+                        event_type=f["type"],
+                        severity=get_severity(f["type"]),
+                        client_ip=client_ip,
+                        details=f,
+                        request_path=request_path,
+                        request_method=request_method,
+                    )
 
             return Response(
                 content=json.dumps({
@@ -109,6 +119,8 @@ class SecurityGate(BaseHTTPMiddleware):
         response_body = b""
         async for chunk in response.body_iterator:
             response_body += chunk
+            if len(response_body) > 100_000:  # Don't buffer huge responses
+                break
 
         response_text = response_body.decode("utf-8", errors="ignore")
         leak_findings = []
