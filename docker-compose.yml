@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  aegis:
+    build: .
+    ports:
+      - "8443:8443"
+    environment:
+      - AEGIS_HOST=0.0.0.0
+      - AEGIS_PORT=8443
+      - AEGIS_MAX_REQUESTS=100
+      - AEGIS_JWT_SECRET=${JWT_SECRET:-}
+    volumes:
+      - ./logs:/app/logs
+      - ./certs:/app/certs
+    restart: unless-stopped
+
+  # Example: Your real API behind Aegis
+  # your-api:
+  #   image: your-api-image
+  #   ports:
+  #     - "9000:9000"

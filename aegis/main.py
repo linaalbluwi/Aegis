@@ -1,22 +1,25 @@
 """
-API Security Agent - Main Application
+Aegis - API Security Agent
 """
+import os
 from fastapi import FastAPI
 from aegis.middleware.security_gate import SecurityGate
 from aegis.middleware.security_headers import SecurityHeaders
 
-app = FastAPI(title="API Security Agent")
+app = FastAPI(title="Aegis - API Security")
 
-# Add security headers first (applied last in response)
 app.add_middleware(SecurityHeaders)
-
-# Add security gate
 app.add_middleware(SecurityGate)
 
 
 @app.get("/")
 async def root():
-    return {"message": "API Security Agent is running"}
+    return {"message": "Aegis is protecting your API"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
 
 
 @app.get("/users")
