@@ -9,6 +9,7 @@ from api_security_agent.detectors.xss import detect_xss
 from api_security_agent.detectors.command_injection import detect_command_injection
 from api_security_agent.detectors.path_traversal import detect_path_traversal
 from api_security_agent.detectors.data_leak import detect_pii, detect_sensitive_keywords
+from api_security_agent.detectors.jwt_inspector import extract_jwt, inspect_jwt
 from api_security_agent.middleware.rate_limiter import rate_limit
 from api_security_agent.utils.logger import log_event, get_severity
 
@@ -34,6 +35,23 @@ class SecurityGate(BaseHTTPMiddleware):
             return rate_limit_response
 
         findings = []
+
+        # --- JWT INSPECTION ---
+        auth_header = request.headers.get("authorization", "")
+        if auth_header:
+            token = extract_jwt(auth_header)
+            if token:
+                jwt_findings = inspect_jwt(token)
+                findings.extend(jwt_findings)
+                for f in jwt_findings:
+                    log_event(
+                        event_type=f["type"],
+                        severity=f.get("severity", "HIGH"),
+                        client_ip=client_ip,
+                        details=f,
+                        request_path=request_path,
+                        request_method=request_method,
+                    )
 
         # --- INBOUND: Inspect the request ---
         body = b""
@@ -65,6 +83,8 @@ class SecurityGate(BaseHTTPMiddleware):
             print(f"[!] BLOCKED - {len(findings)} threat(s) detected:")
             for f in findings:
                 print(f"    - {f}")
+                if f.get("type", "").startswith("JWT"):
+                    continue  # Already logged above
                 log_event(
                     event_type=f["type"],
                     severity=get_severity(f["type"]),

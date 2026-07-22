@@ -3,8 +3,14 @@ API Security Agent - Main Application
 """
 from fastapi import FastAPI
 from api_security_agent.middleware.security_gate import SecurityGate
+from api_security_agent.middleware.security_headers import SecurityHeaders
 
 app = FastAPI(title="API Security Agent")
+
+# Add security headers first (applied last in response)
+app.add_middleware(SecurityHeaders)
+
+# Add security gate
 app.add_middleware(SecurityGate)
 
 
