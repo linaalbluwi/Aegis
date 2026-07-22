@@ -3,7 +3,7 @@ Pytest fixtures for API Security Agent tests.
 """
 import pytest
 from httpx import AsyncClient, ASGITransport
-from api_security_agent.main import app
+from aegis.main import app
 
 
 @pytest.fixture

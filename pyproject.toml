@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "api-security-agent"
+name = "aegis"
 version = "0.1.0"
 description = "Protect your API from SQL injection, XSS, command injection, path traversal, and data leaks"
 readme = "README.md"
@@ -41,7 +41,7 @@ dev = [
 ]
 
 [project.scripts]
-api-security = "api_security_agent.cli:main"
+aegis = "aegis.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["api_security_agent*"]

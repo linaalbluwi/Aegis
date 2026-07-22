@@ -2,8 +2,8 @@
 API Security Agent - Main Application
 """
 from fastapi import FastAPI
-from api_security_agent.middleware.security_gate import SecurityGate
-from api_security_agent.middleware.security_headers import SecurityHeaders
+from aegis.middleware.security_gate import SecurityGate
+from aegis.middleware.security_headers import SecurityHeaders
 
 app = FastAPI(title="API Security Agent")
 

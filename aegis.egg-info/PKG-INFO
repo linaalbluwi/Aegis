@@ -1,5 +1,5 @@
 Metadata-Version: 2.4
-Name: api-security-agent
+Name: aegis
 Version: 0.1.0
 Summary: Protect your API from SQL injection, XSS, command injection, path traversal, and data leaks
 Author-email: linaalbluwi <linaalbluwi3@gmail.com>

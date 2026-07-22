@@ -1,0 +1,14 @@
+README.md
+pyproject.toml
+aegis.egg-info/PKG-INFO
+aegis.egg-info/SOURCES.txt
+aegis.egg-info/dependency_links.txt
+aegis.egg-info/entry_points.txt
+aegis.egg-info/requires.txt
+aegis.egg-info/top_level.txt
+tests/test_command_injection.py
+tests/test_jwt.py
+tests/test_path_traversal.py
+tests/test_security_headers.py
+tests/test_sqli.py
+tests/test_xss.py

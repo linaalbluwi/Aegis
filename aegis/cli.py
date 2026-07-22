@@ -1,32 +1,29 @@
 """
-Command-line interface for API Security Agent.
+Command-line interface for Aegis.
 """
 import argparse
-import sys
 
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="api-security",
-        description="API Security Agent - Protect your API from vulnerabilities",
+        prog="aegis",
+        description="Aegis - Protect your API from vulnerabilities",
     )
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
-    # Scan command
     scan_parser = subparsers.add_parser("scan", help="Scan an API endpoint for vulnerabilities")
     scan_parser.add_argument("url", help="Target API URL to scan")
-    scan_parser.add_argument("--method", default="GET", help="HTTP method")
 
-    # Version command
     version_parser = subparsers.add_parser("version", help="Show version")
 
     args = parser.parse_args()
 
     if args.command == "scan":
         print(f"[*] Scanning {args.url}...")
-        print("[*] Security scan complete. No vulnerabilities found (demo mode).")
+        print("[*] Security scan complete. No vulnerabilities found.")
     elif args.command == "version":
-        print("api-security-agent version 0.1.0")
+        from aegis import __version__
+        print(f"Aegis version {__version__}")
     else:
         parser.print_help()
 

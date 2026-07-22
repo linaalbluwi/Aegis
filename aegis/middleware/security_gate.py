@@ -4,14 +4,14 @@ Main security middleware - inspects all incoming requests and outgoing responses
 import json
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from api_security_agent.detectors.sqli import detect_sqli
-from api_security_agent.detectors.xss import detect_xss
-from api_security_agent.detectors.command_injection import detect_command_injection
-from api_security_agent.detectors.path_traversal import detect_path_traversal
-from api_security_agent.detectors.data_leak import detect_pii, detect_sensitive_keywords
-from api_security_agent.detectors.jwt_inspector import extract_jwt, inspect_jwt
-from api_security_agent.middleware.rate_limiter import rate_limit
-from api_security_agent.utils.logger import log_event, get_severity
+from aegis.detectors.sqli import detect_sqli
+from aegis.detectors.xss import detect_xss
+from aegis.detectors.command_injection import detect_command_injection
+from aegis.detectors.path_traversal import detect_path_traversal
+from aegis.detectors.data_leak import detect_pii, detect_sensitive_keywords
+from aegis.detectors.jwt_inspector import extract_jwt, inspect_jwt
+from aegis.middleware.rate_limiter import rate_limit
+from aegis.utils.logger import log_event, get_severity
 
 
 class SecurityGate(BaseHTTPMiddleware):
