@@ -3,14 +3,14 @@ JWT token inspection and validation.
 """
 import jwt
 import re
+from typing import Optional
 from datetime import datetime, timezone
 
 
-# Pattern to extract JWT from Authorization header
 JWT_PATTERN = r"Bearer\s+([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)"
 
 
-def extract_jwt(text: str) -> str | None:
+def extract_jwt(text: str) -> Optional[str]:
     """Extract a JWT token from a string (e.g., Authorization header)."""
     match = re.search(JWT_PATTERN, text)
     if match:
@@ -18,14 +18,13 @@ def extract_jwt(text: str) -> str | None:
     return None
 
 
-def inspect_jwt(token: str, secret: str | None = None) -> list[dict]:
+def inspect_jwt(token: str, secret: Optional[str] = None) -> list[dict]:
     """
     Inspect a JWT token for security issues.
     Returns a list of findings, empty list if token looks safe.
     """
     findings = []
 
-    # Check if token has 3 parts
     parts = token.split(".")
     if len(parts) != 3:
         findings.append({
@@ -35,7 +34,6 @@ def inspect_jwt(token: str, secret: str | None = None) -> list[dict]:
         })
         return findings
 
-    # Decode header without verification
     try:
         header = jwt.get_unverified_header(token)
     except Exception as e:
@@ -46,7 +44,6 @@ def inspect_jwt(token: str, secret: str | None = None) -> list[dict]:
         })
         return findings
 
-    # Check algorithm
     alg = header.get("alg", "")
     if alg == "none":
         findings.append({
@@ -61,7 +58,6 @@ def inspect_jwt(token: str, secret: str | None = None) -> list[dict]:
             "detail": "HMAC used but no secret provided for verification",
         })
 
-    # Decode payload without verification to check claims
     try:
         payload = jwt.decode(token, options={"verify_signature": False})
     except Exception as e:
@@ -72,7 +68,6 @@ def inspect_jwt(token: str, secret: str | None = None) -> list[dict]:
         })
         return findings
 
-    # Check expiration
     exp = payload.get("exp")
     if exp:
         try:
@@ -90,7 +85,6 @@ def inspect_jwt(token: str, secret: str | None = None) -> list[dict]:
                 "detail": "Invalid expiration timestamp",
             })
 
-    # Check not-before
     nbf = payload.get("nbf")
     if nbf:
         try:
@@ -104,7 +98,6 @@ def inspect_jwt(token: str, secret: str | None = None) -> list[dict]:
         except (TypeError, ValueError, OSError):
             pass
 
-    # Check issued-at (future-dated tokens are suspicious)
     iat = payload.get("iat")
     if iat:
         try:
@@ -118,7 +111,6 @@ def inspect_jwt(token: str, secret: str | None = None) -> list[dict]:
         except (TypeError, ValueError, OSError):
             pass
 
-    # Verify signature if secret provided
     if secret:
         try:
             jwt.decode(token, secret, algorithms=[alg] if alg != "none" else [])
