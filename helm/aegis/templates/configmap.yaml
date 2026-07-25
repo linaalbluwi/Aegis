@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  namespace: {{ .Release.Namespace }}
+data:
+  AEGIS_MAX_REQUESTS: "{{ .Values.config.maxRequests }}"
+  AEGIS_WINDOW_SECONDS: "{{ .Values.config.windowSeconds }}"
+  AEGIS_BLOCK_DURATION: "{{ .Values.config.blockDuration }}"
+  AEGIS_ENABLE_SQLI: "{{ .Values.config.enableSqli }}"
+  AEGIS_ENABLE_XSS: "{{ .Values.config.enableXss }}"
+  AEGIS_ENABLE_COMMAND_INJECTION: "{{ .Values.config.enableCommandInjection }}"
+  AEGIS_ENABLE_PATH_TRAVERSAL: "{{ .Values.config.enablePathTraversal }}"
+  AEGIS_ENABLE_JWT: "{{ .Values.config.enableJwt }}"
+  AEGIS_ENABLE_DATA_LEAK: "{{ .Values.config.enableDataLeak }}"
+  AEGIS_ENABLE_RATE_LIMIT: "{{ .Values.config.enableRateLimit }}"
