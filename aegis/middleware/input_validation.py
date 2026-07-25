@@ -1,12 +1,13 @@
 """
 Input validation middleware - enforces size and content limits.
 """
+from typing import Optional
 from fastapi import Request, Response
 import json
 from aegis import config
 
 
-def validate_request(request: Request, body: bytes) -> Response | None:
+def validate_request(request: Request, body: bytes) -> Optional[Response]:
     if len(body) > config.MAX_BODY_SIZE:
         return Response(
             content=json.dumps({"error": "Request body too large"}),

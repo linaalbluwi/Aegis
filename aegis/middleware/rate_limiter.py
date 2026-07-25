@@ -3,6 +3,7 @@ Rate limiter - blocks IPs that exceed request thresholds.
 """
 import time
 from collections import defaultdict
+from typing import Optional
 from fastapi import Request, Response
 import json
 from aegis import config
@@ -11,7 +12,7 @@ request_log = defaultdict(list)
 blocked_ips = {}
 
 
-def rate_limit(request: Request) -> Response | None:
+def rate_limit(request: Request) -> Optional[Response]:
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
 
