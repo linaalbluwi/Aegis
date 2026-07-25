@@ -2,6 +2,7 @@
 Main security middleware - inspects all incoming requests and outgoing responses.
 """
 import json
+import time
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from aegis import config
@@ -14,11 +15,13 @@ from aegis.detectors.jwt_inspector import extract_jwt, inspect_jwt
 from aegis.middleware.rate_limiter import rate_limit
 from aegis.middleware.input_validation import validate_request
 from aegis.utils.logger import log_event, get_severity
+from aegis.utils.metrics import metrics, request_duration
 
 
 class SecurityGate(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
+        start_time = time.monotonic()
         client_ip = request.client.host if request.client else "unknown"
         request_path = request.url.path
         request_method = request.method
@@ -27,6 +30,7 @@ class SecurityGate(BaseHTTPMiddleware):
         if config.ENABLE_RATE_LIMIT:
             rate_limit_response = rate_limit(request)
             if rate_limit_response:
+                metrics.record_rate_limit(client_ip)
                 log_event(
                     event_type="RATE_LIMIT",
                     severity=get_severity("RATE_LIMIT"),
@@ -35,6 +39,7 @@ class SecurityGate(BaseHTTPMiddleware):
                     request_path=request_path,
                     request_method=request_method,
                 )
+                metrics.record_request(request_method, request_path, 429)
                 return rate_limit_response
 
         # --- INPUT VALIDATION ---
@@ -44,6 +49,7 @@ class SecurityGate(BaseHTTPMiddleware):
 
         validation_response = validate_request(request, body)
         if validation_response:
+            metrics.record_request(request_method, request_path, validation_response.status_code)
             return validation_response
 
         findings = []
@@ -107,6 +113,7 @@ class SecurityGate(BaseHTTPMiddleware):
             print(f"[!] BLOCKED - {len(findings)} threat(s) detected:")
             for f in findings:
                 print(f"    - {f}")
+                metrics.record_attack(f["type"], get_severity(f["type"]))
                 if not f.get("type", "").startswith("JWT"):
                     log_event(
                         event_type=f["type"],
@@ -116,6 +123,10 @@ class SecurityGate(BaseHTTPMiddleware):
                         request_path=request_path,
                         request_method=request_method,
                     )
+
+            metrics.record_request(request_method, request_path, 403)
+            duration = time.monotonic() - start_time
+            request_duration.labels(method=request_method, endpoint=request_path).observe(duration)
 
             return Response(
                 content=json.dumps({"error": "Request blocked"}),
@@ -151,11 +162,19 @@ class SecurityGate(BaseHTTPMiddleware):
                         request_method=request_method,
                     )
 
+            metrics.record_request(request_method, request_path, response.status_code)
+            duration = time.monotonic() - start_time
+            request_duration.labels(method=request_method, endpoint=request_path).observe(duration)
+
             return Response(
                 content=response_body,
                 status_code=response.status_code,
                 headers=dict(response.headers),
                 media_type=response.media_type,
             )
+
+        metrics.record_request(request_method, request_path, response.status_code)
+        duration = time.monotonic() - start_time
+        request_duration.labels(method=request_method, endpoint=request_path).observe(duration)
 
         return response
