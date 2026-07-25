@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aegis-config
+  namespace: aegis
+data:
+  AEGIS_HOST: "0.0.0.0"
+  AEGIS_PORT: "8443"
+  AEGIS_MAX_REQUESTS: "100"
+  AEGIS_WINDOW_SECONDS: "60"
+  AEGIS_BLOCK_DURATION: "120"
+  AEGIS_MAX_BODY_SIZE: "1048576"
+  AEGIS_ENABLE_SQLI: "true"
+  AEGIS_ENABLE_XSS: "true"
+  AEGIS_ENABLE_COMMAND_INJECTION: "true"
+  AEGIS_ENABLE_PATH_TRAVERSAL: "true"
+  AEGIS_ENABLE_JWT: "true"
+  AEGIS_ENABLE_DATA_LEAK: "true"
+  AEGIS_ENABLE_RATE_LIMIT: "true"

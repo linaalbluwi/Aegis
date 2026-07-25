@@ -1,0 +1,14 @@
+apiVersion: v2
+name: aegis
+description: API Security Agent - Protect your API from vulnerabilities
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - security
+  - api
+  - waf
+  - fastapi
+maintainers:
+  - name: linaalbluwi
+    email: linaalbluwi3@gmail.com
