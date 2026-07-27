@@ -6,7 +6,7 @@ metadata:
   labels:
     app: aegis
 spec:
-  replicas: 3
+  replicas: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -23,6 +23,8 @@ spec:
       containers:
       - name: aegis
         image: linaalbluwi/aegis-api-shield:latest
+        command: ["uvicorn"]
+        args: ["aegis.main:app", "--host", "0.0.0.0", "--port", "8443"]
         ports:
         - containerPort: 8443
           protocol: TCP
@@ -31,7 +33,7 @@ spec:
             name: aegis-config
         resources:
           requests:
-            memory: "128Mi"
+            memory: "256Mi"
             cpu: "100m"
           limits:
             memory: "512Mi"
@@ -40,13 +42,13 @@ spec:
           httpGet:
             path: /health
             port: 8443
-            scheme: HTTPS
-          initialDelaySeconds: 10
+            scheme: HTTP
+          initialDelaySeconds: 15
           periodSeconds: 15
         readinessProbe:
           httpGet:
             path: /health
             port: 8443
-            scheme: HTTPS
-          initialDelaySeconds: 5
+            scheme: HTTP
+          initialDelaySeconds: 10
           periodSeconds: 10
