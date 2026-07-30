@@ -1,179 +1,80 @@
 """
-Main security middleware - inspects all incoming requests and outgoing responses.
+Security middleware using Chain of Responsibility pattern.
 """
-import json
 import time
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from aegis import config
+from aegis.chain.base import MiddlewareChain
+from aegis.chain.handlers import (
+    RateLimitHandler,
+    InputValidationHandler,
+    JWTHandler,
+    DetectionHandler,
+    SecurityHeadersHandler,
+)
+from aegis.detectors.base import Finding
 from aegis.detectors.sqli import detect_sqli
 from aegis.detectors.xss import detect_xss
 from aegis.detectors.command_injection import detect_command_injection
 from aegis.detectors.path_traversal import detect_path_traversal
-from aegis.detectors.data_leak import detect_pii, detect_sensitive_keywords
-from aegis.detectors.jwt_inspector import extract_jwt, inspect_jwt
-from aegis.middleware.rate_limiter import rate_limit
-from aegis.middleware.input_validation import validate_request
-from aegis.utils.logger import log_event, get_severity
 from aegis.utils.metrics import metrics, request_duration
+
+
+def _convert(findings_list, attack_type, severity):
+    result = []
+    for f in findings_list:
+        result.append(Finding(
+            detector_name=attack_type.lower(),
+            attack_type=attack_type,
+            severity=severity,
+            match=f.get("match", ""),
+            position=f.get("position", 0),
+            pattern=f.get("pattern", ""),
+        ))
+    return result
+
+
+chain = MiddlewareChain()
+chain.add(RateLimitHandler())
+chain.add(InputValidationHandler())
+chain.add(JWTHandler())
+
+detection = DetectionHandler()
+
+class DetectorAdapter:
+    def __init__(self, name, attack_type, severity, detect_fn):
+        self._name = name
+        self._attack_type = attack_type
+        self._severity = severity
+        self._detect_fn = detect_fn
+
+    def analyze(self, payload):
+        findings = self._detect_fn(payload)
+        return _convert(findings, self._attack_type, self._severity)
+
+detection.register_detector(DetectorAdapter("sqli", "SQL_INJECTION", "CRITICAL", detect_sqli))
+detection.register_detector(DetectorAdapter("xss", "XSS", "HIGH", detect_xss))
+detection.register_detector(DetectorAdapter("cmdi", "COMMAND_INJECTION", "CRITICAL", detect_command_injection))
+detection.register_detector(DetectorAdapter("path_traversal", "PATH_TRAVERSAL", "HIGH", detect_path_traversal))
+
+chain.add(detection)
+chain.add(SecurityHeadersHandler())
 
 
 class SecurityGate(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         start_time = time.monotonic()
-        client_ip = request.client.host if request.client else "unknown"
         request_path = request.url.path
         request_method = request.method
 
-        # --- RATE LIMIT CHECK ---
-        if config.ENABLE_RATE_LIMIT:
-            rate_limit_response = rate_limit(request)
-            if rate_limit_response:
-                metrics.record_rate_limit(client_ip)
-                log_event(
-                    event_type="RATE_LIMIT",
-                    severity=get_severity("RATE_LIMIT"),
-                    client_ip=client_ip,
-                    details={"reason": "Rate limit exceeded"},
-                    request_path=request_path,
-                    request_method=request_method,
-                )
-                metrics.record_request(request_method, request_path, 429)
-                return rate_limit_response
-
-        # --- INPUT VALIDATION ---
-        body = b""
-        if request.method in ("POST", "PUT", "PATCH"):
-            body = await request.body()
-
-        validation_response = validate_request(request, body)
-        if validation_response:
-            metrics.record_request(request_method, request_path, validation_response.status_code)
-            return validation_response
-
-        findings = []
-
-        # --- JWT INSPECTION ---
-        if config.ENABLE_JWT:
-            auth_header = request.headers.get("authorization", "")
-            if auth_header:
-                token = extract_jwt(auth_header)
-                if token:
-                    jwt_findings = inspect_jwt(token, secret=config.JWT_SECRET)
-                    findings.extend(jwt_findings)
-                    for f in jwt_findings:
-                        log_event(
-                            event_type=f["type"],
-                            severity=f.get("severity", "HIGH"),
-                            client_ip=client_ip,
-                            details=f,
-                            request_path=request_path,
-                            request_method=request_method,
-                        )
-
-        # --- INBOUND: Inspect the request ---
-        suspicious_headers = ["user-agent", "referer", "x-forwarded-for", "cookie"]
-
-        for key, value in request.query_params.items():
-            safe_value = value[:2000]
-            if config.ENABLE_SQLI:
-                findings.extend(detect_sqli(safe_value))
-            if config.ENABLE_XSS:
-                findings.extend(detect_xss(safe_value))
-            if config.ENABLE_COMMAND_INJECTION:
-                findings.extend(detect_command_injection(safe_value))
-            if config.ENABLE_PATH_TRAVERSAL:
-                findings.extend(detect_path_traversal(safe_value))
-
-        for key, value in request.headers.items():
-            if key.lower() in suspicious_headers:
-                safe_value = value[:1000]
-                if config.ENABLE_SQLI:
-                    findings.extend(detect_sqli(safe_value))
-                if config.ENABLE_XSS:
-                    findings.extend(detect_xss(safe_value))
-                if config.ENABLE_COMMAND_INJECTION:
-                    findings.extend(detect_command_injection(safe_value))
-                if config.ENABLE_PATH_TRAVERSAL:
-                    findings.extend(detect_path_traversal(safe_value))
-
-        if body:
-            body_text = body.decode("utf-8", errors="ignore")[:config.MAX_BODY_SCAN]
-            if config.ENABLE_SQLI:
-                findings.extend(detect_sqli(body_text))
-            if config.ENABLE_XSS:
-                findings.extend(detect_xss(body_text))
-            if config.ENABLE_COMMAND_INJECTION:
-                findings.extend(detect_command_injection(body_text))
-            if config.ENABLE_PATH_TRAVERSAL:
-                findings.extend(detect_path_traversal(body_text))
-
-        if findings:
-            print(f"[!] BLOCKED - {len(findings)} threat(s) detected:")
-            for f in findings:
-                print(f"    - {f}")
-                metrics.record_attack(f["type"], get_severity(f["type"]))
-                if not f.get("type", "").startswith("JWT"):
-                    log_event(
-                        event_type=f["type"],
-                        severity=get_severity(f["type"]),
-                        client_ip=client_ip,
-                        details=f,
-                        request_path=request_path,
-                        request_method=request_method,
-                    )
-
-            metrics.record_request(request_method, request_path, 403)
-            duration = time.monotonic() - start_time
-            request_duration.labels(method=request_method, endpoint=request_path).observe(duration)
-
-            return Response(
-                content=json.dumps({"error": "Request blocked"}),
-                status_code=403,
-                media_type="application/json",
-            )
-
-        # --- OUTBOUND ---
-        response = await call_next(request)
-
-        if config.ENABLE_DATA_LEAK:
-            response_body = b""
-            async for chunk in response.body_iterator:
-                response_body += chunk
-                if len(response_body) > config.MAX_RESPONSE_SCAN:
-                    break
-
-            response_text = response_body.decode("utf-8", errors="ignore")
-            leak_findings = []
-            leak_findings.extend(detect_pii(response_text))
-            leak_findings.extend(detect_sensitive_keywords(response_text))
-
-            if leak_findings:
-                print(f"[!] DATA LEAK DETECTED in response:")
-                for f in leak_findings:
-                    print(f"    - {f}")
-                    log_event(
-                        event_type=f.get("type", f.get("pii_type", "DATA_LEAK")),
-                        severity=get_severity(f.get("type", f.get("pii_type", "DATA_LEAK"))),
-                        client_ip=client_ip,
-                        details=f,
-                        request_path=request_path,
-                        request_method=request_method,
-                    )
-
+        async def final_handler(req):
+            response = await call_next(req)
             metrics.record_request(request_method, request_path, response.status_code)
-            duration = time.monotonic() - start_time
-            request_duration.labels(method=request_method, endpoint=request_path).observe(duration)
+            return response
 
-            return Response(
-                content=response_body,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                media_type=response.media_type,
-            )
+        response = await chain.execute(request, final_handler)
 
-        metrics.record_request(request_method, request_path, response.status_code)
         duration = time.monotonic() - start_time
         request_duration.labels(method=request_method, endpoint=request_path).observe(duration)
 
