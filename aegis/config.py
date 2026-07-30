@@ -37,3 +37,7 @@ ENABLE_RATE_LIMIT = os.getenv("AEGIS_ENABLE_RATE_LIMIT", "true").lower() == "tru
 # Audit trail
 AUDIT_ENABLED = os.getenv("AEGIS_AUDIT_ENABLED", "true").lower() == "true"
 AUDIT_LOG_FILE = os.getenv("AEGIS_AUDIT_LOG_FILE", "logs/audit.json")
+
+# Backend verification
+BACKEND_SECRET = os.getenv("AEGIS_BACKEND_SECRET", "")
+BACKEND_HEADER = os.getenv("AEGIS_BACKEND_HEADER", "X-Aegis-Verified")

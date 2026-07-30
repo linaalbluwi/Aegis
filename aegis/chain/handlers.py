@@ -17,8 +17,6 @@ blocked_ips = {}
 
 
 class RateLimitHandler(Handler):
-    """Blocks requests that exceed rate limits."""
-
     async def handle(self, request, call_next):
         if not config.ENABLE_RATE_LIMIT:
             return await call_next()
@@ -54,8 +52,6 @@ class RateLimitHandler(Handler):
 
 
 class InputValidationHandler(Handler):
-    """Validates request size and content limits."""
-
     async def handle(self, request, call_next):
         body = b""
         if request.method in ("POST", "PUT", "PATCH"):
@@ -67,6 +63,18 @@ class InputValidationHandler(Handler):
                 status_code=413,
                 media_type="application/json",
             )
+
+        # HTTP Parameter Pollution detection
+        raw_query = request.url.query
+        if raw_query:
+            param_names = [p.split('=')[0] for p in raw_query.split('&') if '=' in p]
+            duplicates = [p for p in param_names if param_names.count(p) > 1]
+            if duplicates:
+                return Response(
+                    content=json.dumps({"error": "Request blocked"}),
+                    status_code=400,
+                    media_type="application/json",
+                )
 
         for key, value in request.query_params.items():
             if len(value) > config.MAX_QUERY_LENGTH:
@@ -80,8 +88,6 @@ class InputValidationHandler(Handler):
 
 
 class JWTHandler(Handler):
-    """Inspects JWT tokens for attacks."""
-
     async def handle(self, request, call_next):
         if not config.ENABLE_JWT:
             return await call_next()
@@ -105,7 +111,6 @@ class JWTHandler(Handler):
                     request_path=request.url.path,
                     request_method=request.method,
                 )
-
             return Response(
                 content=json.dumps({"error": "Request blocked"}),
                 status_code=403,
@@ -116,8 +121,6 @@ class JWTHandler(Handler):
 
 
 class DetectionHandler(Handler):
-    """Runs all registered attack detectors with input normalization."""
-
     def __init__(self):
         self._detectors = []
 
@@ -132,16 +135,13 @@ class DetectionHandler(Handler):
             body = await request.body()
             body_text = body.decode("utf-8", errors="ignore")[:config.MAX_BODY_SCAN]
 
-        # Scan query parameters with normalization
         for key, value in request.query_params.items():
             normalized = normalize(value[:2000])
             for detector in self._detectors:
                 findings.extend(detector.analyze(normalized))
-                # Also scan the original in case normalization breaks something
                 if normalized != value:
                     findings.extend(detector.analyze(value[:2000]))
 
-        # Scan headers with normalization
         suspicious_headers = ["user-agent", "referer", "x-forwarded-for", "cookie"]
         for key, value in request.headers.items():
             if key.lower() in suspicious_headers:
@@ -149,7 +149,6 @@ class DetectionHandler(Handler):
                 for detector in self._detectors:
                     findings.extend(detector.analyze(normalized))
 
-        # Scan body with normalization
         if body_text:
             normalized = normalize(body_text)
             for detector in self._detectors:
@@ -168,7 +167,6 @@ class DetectionHandler(Handler):
                     request_path=request.url.path,
                     request_method=request.method,
                 )
-
             return Response(
                 content=json.dumps({"error": "Request blocked"}),
                 status_code=403,
@@ -179,21 +177,27 @@ class DetectionHandler(Handler):
 
 
 class SecurityHeadersHandler(Handler):
-    """Adds security headers to all responses."""
-
-    HEADERS = {
-        "X-Content-Type-Options": "nosniff",
-        "X-Frame-Options": "DENY",
-        "X-XSS-Protection": "1; mode=block",
-        "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-        "Content-Security-Policy": "default-src 'self'",
-        "Referrer-Policy": "strict-origin-when-cross-origin",
-        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-        "Cache-Control": "no-store, max-age=0",
-    }
-
     async def handle(self, request, call_next):
         response = await call_next()
-        for header, value in self.HEADERS.items():
-            response.headers[header] = value
+
+        # Standard security headers
+        headers = {
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "X-XSS-Protection": "1; mode=block",
+            "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+            "Content-Security-Policy": "default-src 'self'",
+            "Referrer-Policy": "strict-origin-when-cross-origin",
+            "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+            "Cache-Control": "no-store, max-age=0",
+        }
+
+        # Backend verification header (proves request passed through Aegis)
+        if config.BACKEND_SECRET:
+            headers[config.BACKEND_HEADER] = config.BACKEND_SECRET
+
+        for header, value in headers.items():
+            if value:  # Only add if non-empty
+                response.headers[header] = value
+
         return response
