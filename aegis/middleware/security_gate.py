@@ -1,5 +1,6 @@
 """
 Security middleware using Chain of Responsibility pattern.
+Includes circuit breaker, retry, and graceful degradation.
 """
 import time
 import os
@@ -19,6 +20,7 @@ from aegis.detectors.xss import detect_xss
 from aegis.detectors.command_injection import detect_command_injection
 from aegis.detectors.path_traversal import detect_path_traversal
 from aegis.utils.metrics import metrics, request_duration
+from aegis.utils.resilience import FailOpenGate, logger
 
 
 def _convert(findings_list, attack_type, severity):
@@ -61,6 +63,9 @@ detection.register_detector(DetectorAdapter("path_traversal", "PATH_TRAVERSAL", 
 chain.add(detection)
 chain.add(SecurityHeadersHandler())
 
+# Fail-open gate
+fail_open = FailOpenGate(max_concurrent=100, degrade_after_pct=0.8)
+
 
 class SecurityGate(BaseHTTPMiddleware):
 
@@ -82,14 +87,33 @@ class SecurityGate(BaseHTTPMiddleware):
                         media_type="application/json",
                     )
 
-        async def final_handler(req):
-            response = await call_next(req)
+        # Fail-open check
+        can_check = fail_open.acquire()
+
+        try:
+            if not can_check:
+                # Fail-open mode: skip security, let request through
+                logger.warning(f"FAIL-OPEN: Bypassing security for {request_method} {request_path}")
+                response = await call_next(request)
+                metrics.record_request(request_method, request_path, response.status_code)
+                return response
+
+            async def final_handler(req):
+                response = await call_next(req)
+                metrics.record_request(request_method, request_path, response.status_code)
+                return response
+
+            response = await chain.execute(request, final_handler)
+            return response
+
+        except Exception as e:
+            logger.error(f"Security chain error: {str(e)[:200]}")
+            # On unexpected error, fail-open
+            response = await call_next(request)
             metrics.record_request(request_method, request_path, response.status_code)
             return response
 
-        response = await chain.execute(request, final_handler)
-
-        duration = time.monotonic() - start_time
-        request_duration.labels(method=request_method, endpoint=request_path).observe(duration)
-
-        return response
+        finally:
+            fail_open.release()
+            duration = time.monotonic() - start_time
+            request_duration.labels(method=request_method, endpoint=request_path).observe(duration)
