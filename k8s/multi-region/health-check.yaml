@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-check-config
+  namespace: aegis
+data:
+  endpoint: /health
+  protocol: HTTPS
+  port: "443"
+  interval: "30"
+  failureThreshold: "3"
+  ttl: "60"
