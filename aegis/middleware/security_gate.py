@@ -2,6 +2,7 @@
 Security middleware using Chain of Responsibility pattern.
 """
 import time
+import os
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from aegis.chain.base import MiddlewareChain
@@ -67,6 +68,19 @@ class SecurityGate(BaseHTTPMiddleware):
         start_time = time.monotonic()
         request_path = request.url.path
         request_method = request.method
+
+        # Protect metrics endpoint
+        if request_path == "/metrics":
+            metrics_token = os.getenv("AEGIS_METRICS_TOKEN", "")
+            if metrics_token:
+                auth = request.headers.get("authorization", "")
+                expected = f"Bearer {metrics_token}"
+                if auth != expected:
+                    return Response(
+                        content='{"error": "Unauthorized"}',
+                        status_code=401,
+                        media_type="application/json",
+                    )
 
         async def final_handler(req):
             response = await call_next(req)

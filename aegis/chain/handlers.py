@@ -8,6 +8,7 @@ from fastapi import Request, Response
 from aegis import config
 from aegis.chain.base import Handler
 from aegis.detectors.jwt_inspector import extract_jwt, inspect_jwt
+from aegis.detectors.normalizer import normalize
 from aegis.utils.logger import log_event, get_severity
 from aegis.utils.metrics import metrics
 
@@ -115,13 +116,12 @@ class JWTHandler(Handler):
 
 
 class DetectionHandler(Handler):
-    """Runs all registered attack detectors on the request."""
+    """Runs all registered attack detectors with input normalization."""
 
     def __init__(self):
         self._detectors = []
 
     def register_detector(self, detector):
-        """Register an attack detector."""
         self._detectors.append(detector)
 
     async def handle(self, request, call_next):
@@ -132,19 +132,30 @@ class DetectionHandler(Handler):
             body = await request.body()
             body_text = body.decode("utf-8", errors="ignore")[:config.MAX_BODY_SCAN]
 
+        # Scan query parameters with normalization
         for key, value in request.query_params.items():
+            normalized = normalize(value[:2000])
             for detector in self._detectors:
-                findings.extend(detector.analyze(value[:2000]))
+                findings.extend(detector.analyze(normalized))
+                # Also scan the original in case normalization breaks something
+                if normalized != value:
+                    findings.extend(detector.analyze(value[:2000]))
 
+        # Scan headers with normalization
         suspicious_headers = ["user-agent", "referer", "x-forwarded-for", "cookie"]
         for key, value in request.headers.items():
             if key.lower() in suspicious_headers:
+                normalized = normalize(value[:1000])
                 for detector in self._detectors:
-                    findings.extend(detector.analyze(value[:1000]))
+                    findings.extend(detector.analyze(normalized))
 
+        # Scan body with normalization
         if body_text:
+            normalized = normalize(body_text)
             for detector in self._detectors:
-                findings.extend(detector.analyze(body_text))
+                findings.extend(detector.analyze(normalized))
+                if normalized != body_text:
+                    findings.extend(detector.analyze(body_text))
 
         if findings:
             for f in findings:

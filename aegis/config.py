@@ -33,3 +33,7 @@ ENABLE_PATH_TRAVERSAL = os.getenv("AEGIS_ENABLE_PATH_TRAVERSAL", "true").lower()
 ENABLE_JWT = os.getenv("AEGIS_ENABLE_JWT", "true").lower() == "true"
 ENABLE_DATA_LEAK = os.getenv("AEGIS_ENABLE_DATA_LEAK", "true").lower() == "true"
 ENABLE_RATE_LIMIT = os.getenv("AEGIS_ENABLE_RATE_LIMIT", "true").lower() == "true"
+
+# Audit trail
+AUDIT_ENABLED = os.getenv("AEGIS_AUDIT_ENABLED", "true").lower() == "true"
+AUDIT_LOG_FILE = os.getenv("AEGIS_AUDIT_LOG_FILE", "logs/audit.json")
