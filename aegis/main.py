@@ -5,6 +5,7 @@ from fastapi import FastAPI, Response
 from aegis.middleware.security_gate import SecurityGate, fail_open
 from aegis.middleware.security_headers import SecurityHeaders
 from aegis.utils.metrics import metrics
+from aegis.utils.slo import get_slo_report
 
 app = FastAPI(title="Aegis - API Security")
 
@@ -34,6 +35,12 @@ async def health():
 @app.get("/metrics")
 async def get_metrics():
     return Response(content=metrics.get_metrics(), media_type="text/plain")
+
+
+@app.get("/slo")
+async def slo_report():
+    """Service Level Objectives status."""
+    return get_slo_report()
 
 
 @app.get("/users")
